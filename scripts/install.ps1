@@ -8,7 +8,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 $Repo = "imblowsnow/monitor-system"
-$InstallDir = "C:\monitor-agent"
+$InstallDir = Join-Path $env:ProgramData "monitor-agent"
 $ServiceName = "MonitorAgent"
 
 if (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
