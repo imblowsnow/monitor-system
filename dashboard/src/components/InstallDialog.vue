@@ -31,6 +31,16 @@
         <el-tab-pane label="Windows" name="windows" />
       </el-tabs>
 
+      <!-- 下载源切换 -->
+      <div class="field">
+        <div class="field-label">脚本下载源</div>
+        <el-radio-group v-model="source">
+          <el-radio-button value="github">GitHub</el-radio-button>
+          <el-radio-button value="cdn">CDN（国内加速）</el-radio-button>
+        </el-radio-group>
+        <div class="field-hint">GitHub 直连在国内可能不稳定，访问失败时可切换到 CDN（jsDelivr）。</div>
+      </div>
+
       <!-- 安装命令 -->
       <div class="field">
         <div class="field-label">
@@ -66,10 +76,17 @@ const props = defineProps<{
 defineEmits<{ 'update:modelValue': [value: boolean] }>();
 
 const REPO = 'imblowsnow/monitor-system';
-const RAW_BASE = `https://raw.githubusercontent.com/${REPO}/refs/heads/main/scripts`;
 
 const os = ref<'linux' | 'darwin' | 'windows'>('linux');
+const source = ref<'github' | 'cdn'>('github');
 const serverUrl = ref(defaultServerUrl());
+
+// 按下载源推导脚本目录地址：GitHub raw 直连 / jsDelivr CDN 加速
+const rawBase = computed(() =>
+  source.value === 'cdn'
+    ? `https://cdn.jsdelivr.net/gh/${REPO}@main/scripts`
+    : `https://raw.githubusercontent.com/${REPO}/refs/heads/main/scripts`,
+);
 
 // 弹窗每次打开时按当前域名重新推导服务器地址
 watch(() => props.modelValue, (open) => {
@@ -86,11 +103,12 @@ const token = computed(() => props.client?.token || '');
 const command = computed(() => {
   const t = token.value;
   const url = serverUrl.value;
+  const base = rawBase.value;
   if (os.value === 'windows') {
-    return `powershell -Command "iwr ${RAW_BASE}/install.ps1 -OutFile $env:TEMP\\install.ps1; & $env:TEMP\\install.ps1 -Token '${t}' -ServerUrl '${url}'"`;
+    return `powershell -Command "iwr ${base}/install.ps1 -OutFile $env:TEMP\\install.ps1; & $env:TEMP\\install.ps1 -Token '${t}' -ServerUrl '${url}'"`;
   }
   // linux / macos 共用 install.sh，脚本内部按 uname 自动识别
-  return `curl -fsSL ${RAW_BASE}/install.sh | sudo bash -s -- '${t}' '${url}'`;
+  return `curl -fsSL ${base}/install.sh | sudo bash -s -- '${t}' '${url}'`;
 });
 
 async function copy(text: string, label: string) {

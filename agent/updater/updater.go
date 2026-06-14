@@ -41,9 +41,27 @@ func Apply(version string) error {
 }
 
 // fetchScript 从仓库下载最新安装脚本到临时文件，返回脚本路径。
+// 按 scriptURLs 顺序依次尝试，首选 GitHub raw，失败时回退到 CDN。
 func fetchScript() (string, error) {
-	url := scriptURL()
+	urls := scriptURLs()
 	client := &http.Client{Timeout: 30 * time.Second}
+
+	var lastErr error
+	for _, url := range urls {
+		path, err := downloadScript(client, url)
+		if err != nil {
+			log.Printf("[updater] 下载安装脚本失败 (%s): %v", url, err)
+			lastErr = err
+			continue
+		}
+		log.Printf("[updater] 已拉取最新安装脚本: %s", url)
+		return path, nil
+	}
+	return "", fmt.Errorf("所有下载地址均失败: %w", lastErr)
+}
+
+// downloadScript 从单个 url 下载脚本到临时文件，返回脚本路径。
+func downloadScript(client *http.Client, url string) (string, error) {
 	resp, err := client.Get(url)
 	if err != nil {
 		return "", fmt.Errorf("下载安装脚本失败: %w", err)
@@ -70,6 +88,5 @@ func fetchScript() (string, error) {
 	}
 	_ = os.Chmod(path, 0o755)
 
-	log.Printf("[updater] 已拉取最新安装脚本: %s", url)
 	return path, nil
 }

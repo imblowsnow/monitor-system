@@ -12,9 +12,13 @@ import (
 // scriptPattern 临时脚本文件名模式。
 const scriptPattern = "monitor-install-*.ps1"
 
-// scriptURL 返回仓库内最新 install.ps1 的 raw 地址。
-func scriptURL() string {
-	return fmt.Sprintf("https://raw.githubusercontent.com/%s/main/scripts/install.ps1", repo)
+// scriptURLs 返回 install.ps1 的候选下载地址，按优先级排列：
+// 首选 GitHub raw，失败时回退到 jsDelivr CDN。
+func scriptURLs() []string {
+	return []string{
+		fmt.Sprintf("https://raw.githubusercontent.com/%s/main/scripts/install.ps1", repo),
+		fmt.Sprintf("https://cdn.jsdelivr.net/gh/%s@main/scripts/install.ps1", repo),
+	}
 }
 
 // runScript 复用 install.ps1 覆盖安装：参数为 Token、ServerUrl、DownloadUrl。
