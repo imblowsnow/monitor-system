@@ -28,18 +28,18 @@ if (-not (Test-Path $InstallDir)) {
   New-Item -Path $InstallDir -ItemType Directory | Out-Null
 }
 
-# 把安装脚本自身复制到安装目录，供 agent 自更新时复用（覆盖安装）。
-$ScriptSrc = $MyInvocation.MyCommand.Path
-$ScriptDst = Join-Path $InstallDir "install.ps1"
-if ($ScriptSrc -and ($ScriptSrc -ne $ScriptDst)) {
-  Copy-Item -Path $ScriptSrc -Destination $ScriptDst -Force -ErrorAction SilentlyContinue
-}
-
 $ExePath = "$InstallDir\monitor-agent.exe"
 $ExeNew = "$InstallDir\monitor-agent.exe.new"
 
 Write-Host "Downloading agent binary..."
-Invoke-WebRequest -Uri $DownloadUrl -OutFile $ExeNew
+# 先直连 GitHub，失败则用 gh-proxy.org 代理重试（适配国内网络）。
+try {
+  Invoke-WebRequest -Uri $DownloadUrl -OutFile $ExeNew
+} catch {
+  $ProxyUrl = "https://gh-proxy.org/$DownloadUrl"
+  Write-Host "Direct download failed, retrying via proxy: $ProxyUrl" -ForegroundColor Yellow
+  Invoke-WebRequest -Uri $ProxyUrl -OutFile $ExeNew
+}
 
 # 下载校验：非空才继续，避免下载中断损坏现有二进制。
 if (-not (Test-Path $ExeNew) -or (Get-Item $ExeNew).Length -eq 0) {

@@ -45,30 +45,27 @@ echo "Download URL: $DOWNLOAD_URL"
 
 mkdir -p "$INSTALL_DIR"
 
-# 把安装脚本自身落地到安装目录，供 agent 自更新时复用（覆盖安装）。
-# 注意：curl | bash 管道安装时脚本来自 stdin，$0 不是真实文件，cp 拿不到源；
-# 这种情况下回退为从仓库下载 install.sh。
-SCRIPT_SRC="$(readlink -f "$0" 2>/dev/null || echo "$0")"
-SCRIPT_RAW_URL="https://raw.githubusercontent.com/${REPO}/main/scripts/install.sh"
-if [ -f "$SCRIPT_SRC" ] && [ "$SCRIPT_SRC" != "$INSTALL_DIR/install.sh" ]; then
-  cp -f "$SCRIPT_SRC" "$INSTALL_DIR/install.sh" 2>/dev/null || true
-elif [ ! -f "$INSTALL_DIR/install.sh" ]; then
-  if command -v curl &>/dev/null; then
-    curl -fsSL "$SCRIPT_RAW_URL" -o "$INSTALL_DIR/install.sh" 2>/dev/null || true
-  elif command -v wget &>/dev/null; then
-    wget -q "$SCRIPT_RAW_URL" -O "$INSTALL_DIR/install.sh" 2>/dev/null || true
-  fi
-fi
 chmod +x "$INSTALL_DIR/install.sh" 2>/dev/null || true
 
 echo "Downloading agent binary..."
-if command -v curl &>/dev/null; then
-  curl -fSL "$DOWNLOAD_URL" -o "$INSTALL_DIR/monitor-agent.new"
-elif command -v wget &>/dev/null; then
-  wget -q "$DOWNLOAD_URL" -O "$INSTALL_DIR/monitor-agent.new"
-else
-  echo "Neither curl nor wget found" >&2
-  exit 1
+# 单次下载：成功返回 0，失败返回非 0。
+download() {
+  local url="$1" out="$2"
+  if command -v curl &>/dev/null; then
+    curl -fSL "$url" -o "$out"
+  elif command -v wget &>/dev/null; then
+    wget -q "$url" -O "$out"
+  else
+    echo "Neither curl nor wget found" >&2
+    exit 1
+  fi
+}
+
+# 先直连 GitHub，失败则用 gh-proxy.org 代理重试（适配国内网络）。
+if ! download "$DOWNLOAD_URL" "$INSTALL_DIR/monitor-agent.new"; then
+  PROXY_URL="https://gh-proxy.org/${DOWNLOAD_URL}"
+  echo "Direct download failed, retrying via proxy: $PROXY_URL" >&2
+  download "$PROXY_URL" "$INSTALL_DIR/monitor-agent.new"
 fi
 
 chmod +x "$INSTALL_DIR/monitor-agent.new"
