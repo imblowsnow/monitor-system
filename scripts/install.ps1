@@ -70,7 +70,9 @@ if ((-not [string]::IsNullOrEmpty($Token)) -or (-not (Test-Path "$InstallDir\con
     server_url = $ServerUrl
     token      = $Token
   } | ConvertTo-Json
-  $Config | Out-File "$InstallDir\config.json" -Encoding UTF8
+  # 用 .NET 写文件而非 Out-File -Encoding UTF8：后者在 PowerShell 5.1 下会写入 BOM
+  # 头（EF BB BF），Go 的 json.Unmarshal 不识别 BOM，会报 "invalid character 'ï'"。
+  [System.IO.File]::WriteAllText("$InstallDir\config.json", $Config, (New-Object System.Text.UTF8Encoding($false)))
 } else {
   Write-Host "Keeping existing config.json"
 }

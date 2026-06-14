@@ -55,6 +55,21 @@
         </div>
         <div class="field-hint">命令会下载安装脚本并自动写入上述 Token 与服务器地址，注册为开机自启服务。</div>
       </div>
+
+      <!-- 卸载命令 -->
+      <div class="field">
+        <div class="field-label">
+          一键卸载命令
+          <span class="cmd-note">{{ os === 'windows' ? '以管理员身份运行 PowerShell' : '使用 root 权限运行' }}</span>
+        </div>
+        <div class="cmd-box">
+          <pre>{{ uninstallCommand }}</pre>
+          <el-button class="cmd-copy" type="primary" :icon="CopyDocument" @click="copy(uninstallCommand, '卸载命令')">
+            复制
+          </el-button>
+        </div>
+        <div class="field-hint">停止并删除服务，移除安装目录（含二进制与配置文件）。</div>
+      </div>
     </div>
 
     <template #footer>
@@ -109,6 +124,19 @@ const command = computed(() => {
   }
   // linux / macos 共用 install.sh，脚本内部按 uname 自动识别
   return `curl -fsSL ${base}/install.sh | sudo bash -s -- '${t}' '${url}'`;
+});
+
+const uninstallCommand = computed(() => {
+  if (os.value === 'windows') {
+    // 停止并删除 MonitorAgent 服务，再移除安装目录（PowerShell）
+    return `net stop MonitorAgent; sc.exe delete MonitorAgent; Remove-Item -Recurse -Force "$env:ProgramData\\monitor-agent"`;
+  }
+  if (os.value === 'darwin') {
+    // macOS：卸载 launchd 守护进程并删除安装目录
+    return `sudo launchctl unload /Library/LaunchDaemons/com.monitor-agent.plist; sudo rm -f /Library/LaunchDaemons/com.monitor-agent.plist; sudo rm -rf /opt/monitor-agent`;
+  }
+  // Linux：停止禁用 systemd 服务并删除安装目录
+  return `sudo systemctl disable --now monitor-agent; sudo rm -f /etc/systemd/system/monitor-agent.service; sudo systemctl daemon-reload; sudo rm -rf /opt/monitor-agent`;
 });
 
 async function copy(text: string, label: string) {
