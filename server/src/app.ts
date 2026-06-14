@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import authRouter from './routers/auth.js';
-import clientsRouter, { groupsRouter, publicRouter } from './routers/clients.js';
+import clientsRouter, { groupsRouter, publicRouter, updatesRouter } from './routers/clients.js';
 import metricsRouter from './routers/metrics.js';
 import commandsRouter from './routers/commands.js';
 import alertsRouter from './routers/alerts.js';
@@ -24,4 +24,5 @@ app.use('/api/notify-channels', notifyChannelsRouter);
 app.use('/api/tasks', tasksRouter);
 app.use('/api/netnodes', netNodesRouter);
 app.use('/api/system-config', systemConfigRouter);
+app.use('/api/updates', updatesRouter);
 app.use('/api/public', publicRouter);

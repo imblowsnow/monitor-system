@@ -6,10 +6,20 @@
       <span class="status-dot" :class="[client.status, { pulse: client.status === 'online' }]" />
       <div class="db-title">
         <div class="db-name">{{ client.name }}</div>
-        <div class="db-sub">{{ client.hostname }} · {{ client.os }}/{{ client.arch }} · {{ client.ipAddress || '-' }}</div>
+        <div class="db-sub">{{ client.hostname }} · {{ client.os }}/{{ client.arch }} · {{ client.ipAddress || '-' }}<span v-if="client.agentVersion"> · {{ client.agentVersion }}</span></div>
       </div>
       <el-tag :type="statusType(client.status)" effect="light">{{ statusLabel(client.status) }}</el-tag>
       <span v-if="lastUpdate" class="last-upd">更新于 {{ lastUpdate }}</span>
+      <el-tag v-if="updateInfo?.hasUpdate" type="warning" effect="dark" class="upd-tag">
+        新版本 {{ updateInfo.latestVersion }}
+      </el-tag>
+      <el-button
+        v-if="updateInfo?.hasUpdate"
+        type="warning"
+        :loading="updating"
+        :disabled="client.status !== 'online'"
+        @click="pushUpdate"
+      >下发更新</el-button>
       <el-button type="success" :icon="Platform" @click="openTerminal">终端</el-button>
     </div>
 
@@ -115,6 +125,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ArrowLeft, Platform } from '@element-plus/icons-vue';
+import { ElMessage } from 'element-plus';
 import VChart from 'vue-echarts';
 import { use } from 'echarts/core';
 import { LineChart } from 'echarts/charts';
@@ -139,6 +150,9 @@ const metricsHistory = ref<any[]>([]);
 const uptimeData = ref<Segment[]>([]);
 const range = ref<'live' | 'today' | '7d' | '30d'>('live');
 const rangeLoading = ref(false);
+// Agent 更新状态
+const updateInfo = ref<{ hasUpdate: boolean; latestVersion: string | null; currentVersion: string | null } | null>(null);
+const updating = ref(false);
 let unsubs: Array<() => void> = [];
 
 // 降采样：固定范围数据点过多时图表会卡，等距抽样到 max 个点
@@ -246,6 +260,29 @@ function barColor(v: number) {
 
 function openTerminal() {
   router.push({ name: 'Terminal', query: { clientId: client.value.id, name: client.value.name } });
+}
+
+// 拉取 agent 更新状态（版本对比）
+async function loadUpdateInfo() {
+  try {
+    const { data } = await api.get(`/clients/${route.params.id}/update`);
+    updateInfo.value = data;
+  } catch {
+    updateInfo.value = null;
+  }
+}
+
+// 向在线 agent 下发更新指令
+async function pushUpdate() {
+  updating.value = true;
+  try {
+    const { data } = await api.post(`/clients/${route.params.id}/update`);
+    ElMessage.success(`已下发更新到 ${data.version}，agent 将在后台完成更新并重连`);
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.error || '下发更新失败');
+  } finally {
+    updating.value = false;
+  }
 }
 
 // 横轴标签：7天/一个月跨多天，显示「月/日 时:分」；实时/今天只显示时分
@@ -417,6 +454,7 @@ onMounted(async () => {
   metricsHistory.value = history.reverse();
 
   await loadUptime();
+  loadUpdateInfo();
 
   unsubs.push(wsStore.onMetrics(route.params.id as string, (metrics) => {
     // 仅实时模式追加 WS 推送；固定时间范围时保持快照不变

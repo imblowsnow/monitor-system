@@ -11,6 +11,7 @@ import (
 	"monitor-agent/connection"
 	"monitor-agent/executor"
 	"monitor-agent/terminal"
+	"monitor-agent/updater"
 )
 
 func main() {
@@ -48,6 +49,23 @@ func main() {
 	defer ptyManager.CloseAll()
 
 	client.OnMessage(connection.MsgHeartbeatAck, func(msg *connection.WSMessage) {})
+
+	client.OnMessage(connection.MsgAgentUpdate, func(msg *connection.WSMessage) {
+		payload, _ := json.Marshal(msg.Payload)
+		var req struct {
+			Version     string `json:"version"`
+			DownloadURL string `json:"downloadUrl"`
+			Checksum    string `json:"checksum"`
+		}
+		if err := json.Unmarshal(payload, &req); err != nil {
+			log.Printf("Invalid agent_update payload: %v", err)
+			return
+		}
+		log.Printf("Received update request: version=%s", req.Version)
+		if err := updater.Apply(req.Version, req.DownloadURL, req.Checksum); err != nil {
+			log.Printf("Update failed: %v", err)
+		}
+	})
 
 	client.OnMessage(connection.MsgConfigUpdate, func(msg *connection.WSMessage) {
 		payload, _ := json.Marshal(msg.Payload)

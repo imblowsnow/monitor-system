@@ -129,6 +129,20 @@ class ClientManager {
     }
   }
 
+  /** 向指定在线 agent 下发自更新指令。离线返回 false。 */
+  pushUpdate(clientId: string, payload: { version: string; downloadUrl: string; checksum?: string }): boolean {
+    const client = this.clients.get(clientId);
+    if (client && client.ws.readyState === WebSocket.OPEN) {
+      client.ws.send(JSON.stringify({
+        type: 'agent_update',
+        timestamp: Date.now(),
+        payload,
+      }));
+      return true;
+    }
+    return false;
+  }
+
   /** 向所有在线 agent 重新组装并推送配置（节点表变更时用）。 */
   async pushConfigToAll(buildConfig: (clientId: string) => Promise<unknown>) {
     for (const client of this.clients.values()) {

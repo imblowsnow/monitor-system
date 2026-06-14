@@ -95,7 +95,7 @@ const navItems = [
   { to: '/admin/tasks', label: '定时任务', icon: Timer },
   { to: '/admin/alerts', label: '告警', icon: Bell },
   { to: '/admin/netnodes', label: '测速节点', icon: Connection },
-  { to: '/admin/files', label: '文件管理', icon: Folder },
+  // { to: '/admin/files', label: '文件管理', icon: Folder },
   { to: '/admin/settings', label: '设置', icon: Setting },
 ];
 

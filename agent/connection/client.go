@@ -37,6 +37,7 @@ const (
 	MsgConfigRequest  MessageType = "config_request"
 	MsgConfigUpdate   MessageType = "config_update"
 	MsgCollectorReport MessageType = "collector_report"
+	MsgAgentUpdate    MessageType = "agent_update"
 	MsgError          MessageType = "error"
 )
 

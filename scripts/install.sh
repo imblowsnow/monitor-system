@@ -45,24 +45,43 @@ echo "Download URL: $DOWNLOAD_URL"
 
 mkdir -p "$INSTALL_DIR"
 
+# 把安装脚本自身复制到安装目录，供 agent 自更新时复用（覆盖安装）。
+SCRIPT_SRC="$(readlink -f "$0" 2>/dev/null || echo "$0")"
+if [ "$SCRIPT_SRC" != "$INSTALL_DIR/install.sh" ]; then
+  cp -f "$SCRIPT_SRC" "$INSTALL_DIR/install.sh" 2>/dev/null || true
+  chmod +x "$INSTALL_DIR/install.sh" 2>/dev/null || true
+fi
+
 echo "Downloading agent binary..."
 if command -v curl &>/dev/null; then
-  curl -fSL "$DOWNLOAD_URL" -o "$INSTALL_DIR/monitor-agent"
+  curl -fSL "$DOWNLOAD_URL" -o "$INSTALL_DIR/monitor-agent.new"
 elif command -v wget &>/dev/null; then
-  wget -q "$DOWNLOAD_URL" -O "$INSTALL_DIR/monitor-agent"
+  wget -q "$DOWNLOAD_URL" -O "$INSTALL_DIR/monitor-agent.new"
 else
   echo "Neither curl nor wget found" >&2
   exit 1
 fi
 
-chmod +x "$INSTALL_DIR/monitor-agent"
+chmod +x "$INSTALL_DIR/monitor-agent.new"
+# 原子替换：先下载到 .new，校验非空后再 mv 覆盖，避免下载中断损坏现有二进制。
+if [ ! -s "$INSTALL_DIR/monitor-agent.new" ]; then
+  echo "Downloaded binary is empty, abort" >&2
+  rm -f "$INSTALL_DIR/monitor-agent.new"
+  exit 1
+fi
+mv -f "$INSTALL_DIR/monitor-agent.new" "$INSTALL_DIR/monitor-agent"
 
-cat > "$INSTALL_DIR/config.json" <<EOF
+# config.json 幂等：已存在且本次未显式传入 TOKEN 时保留原配置（用于覆盖更新场景）。
+if [ -n "$TOKEN" ] || [ ! -f "$INSTALL_DIR/config.json" ]; then
+  cat > "$INSTALL_DIR/config.json" <<EOF
 {
   "server_url": "$SERVER_URL",
   "token": "$TOKEN"
 }
 EOF
+else
+  echo "Keeping existing config.json"
+fi
 
 OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
 
@@ -119,7 +138,8 @@ EOF
 
   systemctl daemon-reload
   systemctl enable $SERVICE_NAME
-  systemctl start $SERVICE_NAME
+  # 用 restart 而非 start：覆盖安装/更新时需重启以加载新二进制。
+  systemctl restart $SERVICE_NAME
 
   echo "Monitor Agent installed and started."
   echo "Status: systemctl status $SERVICE_NAME"

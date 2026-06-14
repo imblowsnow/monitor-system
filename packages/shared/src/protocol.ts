@@ -22,6 +22,7 @@ export enum MessageType {
   CONFIG_UPDATE = 'config_update',
   COLLECTOR_REPORT = 'collector_report',
   CLIENT_INFO = 'client_info',
+  AGENT_UPDATE = 'agent_update',
   ERROR = 'error',
 }
 
@@ -155,6 +156,16 @@ export interface FileChunkPayload {
 export interface ErrorPayload {
   code: string;
   message: string;
+}
+
+/** Server → Agent：下发自更新指令。agent 据此下载新二进制并执行更新脚本。 */
+export interface AgentUpdatePayload {
+  /** 目标版本号（GitHub Release 的 tag，如 v1.2.3）。 */
+  version: string;
+  /** 与 agent os/arch 匹配的二进制下载地址。 */
+  downloadUrl: string;
+  /** 可选校验和（sha256），用于下载后完整性校验。 */
+  checksum?: string;
 }
 
 export interface CollectorReportPayload {
