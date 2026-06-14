@@ -15,6 +15,14 @@ import (
 )
 
 func main() {
+	// 运行入口按平台分派：Windows 下若由 SCM 拉起则以服务模式运行（与 SCM 握手、
+	// 上报状态），否则交互式运行；非 Windows 直接交互式运行。
+	runAgent(newAgent())
+}
+
+// newAgent 完成全部消息处理器注册与后台采集/心跳 goroutine 的启动，
+// 返回已就绪但尚未进入读循环的 Client。调用方决定如何运行（阻塞或服务化）。
+func newAgent() *connection.Client {
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
@@ -46,7 +54,6 @@ func main() {
 			})
 		},
 	)
-	defer ptyManager.CloseAll()
 
 	client.OnMessage(connection.MsgHeartbeatAck, func(msg *connection.WSMessage) {})
 
@@ -231,8 +238,8 @@ func main() {
 		}
 	}()
 
-	log.Println("Agent starting...")
-	client.Run()
+	log.Println("Agent ready")
+	return client
 }
 
 func generateID() string {
