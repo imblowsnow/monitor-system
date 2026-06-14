@@ -45,12 +45,21 @@ echo "Download URL: $DOWNLOAD_URL"
 
 mkdir -p "$INSTALL_DIR"
 
-# 把安装脚本自身复制到安装目录，供 agent 自更新时复用（覆盖安装）。
+# 把安装脚本自身落地到安装目录，供 agent 自更新时复用（覆盖安装）。
+# 注意：curl | bash 管道安装时脚本来自 stdin，$0 不是真实文件，cp 拿不到源；
+# 这种情况下回退为从仓库下载 install.sh。
 SCRIPT_SRC="$(readlink -f "$0" 2>/dev/null || echo "$0")"
-if [ "$SCRIPT_SRC" != "$INSTALL_DIR/install.sh" ]; then
+SCRIPT_RAW_URL="https://raw.githubusercontent.com/${REPO}/main/scripts/install.sh"
+if [ -f "$SCRIPT_SRC" ] && [ "$SCRIPT_SRC" != "$INSTALL_DIR/install.sh" ]; then
   cp -f "$SCRIPT_SRC" "$INSTALL_DIR/install.sh" 2>/dev/null || true
-  chmod +x "$INSTALL_DIR/install.sh" 2>/dev/null || true
+elif [ ! -f "$INSTALL_DIR/install.sh" ]; then
+  if command -v curl &>/dev/null; then
+    curl -fsSL "$SCRIPT_RAW_URL" -o "$INSTALL_DIR/install.sh" 2>/dev/null || true
+  elif command -v wget &>/dev/null; then
+    wget -q "$SCRIPT_RAW_URL" -O "$INSTALL_DIR/install.sh" 2>/dev/null || true
+  fi
 fi
+chmod +x "$INSTALL_DIR/install.sh" 2>/dev/null || true
 
 echo "Downloading agent binary..."
 if command -v curl &>/dev/null; then

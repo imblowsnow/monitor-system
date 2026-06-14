@@ -1,83 +1,79 @@
 // Package updater 负责 agent 收到 Server 下发的更新指令后执行自更新。
-// 实际的下载、二进制替换与服务重启复用安装脚本 install.sh（覆盖安装），
-// 本包只做参数校验与脚本调用，并把脚本输出记录到日志。
+// 实际的下载、二进制替换与服务重启复用安装脚本（Linux/macOS 为 install.sh，
+// Windows 为 install.ps1，均为覆盖安装）。
+//
+// 安装脚本每次更新都从仓库实时拉取最新版本再执行，避免本地落地的旧脚本
+// 在脚本本身有更新时无法生效。
 package updater
 
 import (
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"os"
-	"os/exec"
-	"path/filepath"
-	"runtime"
 	"sync"
 	"time"
 )
 
+// 安装脚本来源仓库（与 server 端固定一致）。
+const repo = "imblowsnow/monitor-system"
+
 // 同一时刻只允许一个更新流程，避免重复下发导致并发替换二进制。
 var mu sync.Mutex
 
-// Apply 执行一次自更新：定位 update 脚本并以 downloadUrl、version 为参数调用。
-// Windows 暂不支持脚本自更新，直接返回错误（后续可扩展 update.ps1）。
+// Apply 执行一次自更新：实时拉取最新安装脚本，再以 downloadURL 为参数调用。
+// 平台相关的脚本 URL（scriptURL）与执行（runScript）分别在
+// updater_unix.go / updater_windows.go 中实现。
 func Apply(version, downloadURL, checksum string) error {
 	if downloadURL == "" {
 		return fmt.Errorf("downloadUrl 为空，忽略更新")
-	}
-	if runtime.GOOS == "windows" {
-		return fmt.Errorf("windows 暂不支持脚本自更新")
 	}
 
 	mu.Lock()
 	defer mu.Unlock()
 
-	script, err := locateScript()
+	script, err := fetchScript()
 	if err != nil {
 		return err
 	}
 
 	log.Printf("[updater] 开始更新到 %s: %s", version, downloadURL)
-
-	// 复用 install.sh 覆盖安装：参数为 TOKEN、SERVER_URL、DOWNLOAD_URL。
-	// 更新场景下 TOKEN/SERVER_URL 传空，脚本会保留现有 config.json，仅替换二进制并重启服务。
-	// 脚本重启服务后本进程会被 systemd/launchd 终止并以新二进制拉起。
-	cmd := exec.Command("sh", script, "", "", downloadURL)
-	cmd.Stdout = log.Writer()
-	cmd.Stderr = log.Writer()
-
-	done := make(chan error, 1)
-	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("启动更新脚本失败: %w", err)
-	}
-	go func() { done <- cmd.Wait() }()
-
-	select {
-	case err := <-done:
-		if err != nil {
-			return fmt.Errorf("更新脚本执行失败: %w", err)
-		}
-		log.Printf("[updater] 更新脚本执行完成，等待服务重启")
-		return nil
-	case <-time.After(5 * time.Minute):
-		_ = cmd.Process.Kill()
-		return fmt.Errorf("更新脚本超时")
-	}
+	// 临时脚本的清理由各平台 runScript 负责：unix 等脚本执行完后删除，
+	// windows 脚本为分离进程不能在此删（powershell 仍在读），交由其自行处理。
+	return runScript(script, downloadURL)
 }
 
-// locateScript 在二进制同目录查找 install.sh（覆盖安装脚本）。
-func locateScript() (string, error) {
-	exe, err := os.Executable()
+// fetchScript 从仓库下载最新安装脚本到临时文件，返回脚本路径。
+func fetchScript() (string, error) {
+	url := scriptURL()
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Get(url)
 	if err != nil {
-		return "", fmt.Errorf("无法定位可执行文件: %w", err)
+		return "", fmt.Errorf("下载安装脚本失败: %w", err)
 	}
-	dir := filepath.Dir(exe)
-	candidates := []string{
-		filepath.Join(dir, "install.sh"),
-		filepath.Join(dir, "scripts", "install.sh"),
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("下载安装脚本失败: HTTP %d", resp.StatusCode)
 	}
-	for _, c := range candidates {
-		if _, err := os.Stat(c); err == nil {
-			return c, nil
-		}
+
+	f, err := os.CreateTemp("", scriptPattern)
+	if err != nil {
+		return "", fmt.Errorf("创建临时脚本失败: %w", err)
 	}
-	return "", fmt.Errorf("未找到安装脚本 install.sh（已查找 %v）", candidates)
+	path := f.Name()
+
+	if _, err := io.Copy(f, resp.Body); err != nil {
+		f.Close()
+		_ = os.Remove(path)
+		return "", fmt.Errorf("写入临时脚本失败: %w", err)
+	}
+	if err := f.Close(); err != nil {
+		_ = os.Remove(path)
+		return "", fmt.Errorf("保存临时脚本失败: %w", err)
+	}
+	_ = os.Chmod(path, 0o755)
+
+	log.Printf("[updater] 已拉取最新安装脚本: %s", url)
+	return path, nil
 }

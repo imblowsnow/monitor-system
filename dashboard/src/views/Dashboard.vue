@@ -73,7 +73,7 @@
           <span class="status-dot" :class="[c.status, { pulse: c.status === 'online' }]" />
           <div class="node-title">
             <div class="node-name">{{ c.name }}</div>
-            <div class="node-sub">{{ c.hostname || c.ipAddress || '-' }}</div>
+            <div class="node-sub">{{ c.ipAddress || '-' }}</div>
           </div>
           <div class="node-uptime" :class="c.status">{{ uptimeText(c.id) }}</div>
         </div>
@@ -81,7 +81,7 @@
         <div class="node-foot">
           <el-tag size="small" effect="plain" round>{{ c.groupName || 'default' }}</el-tag>
           <span v-if="c.country" :class="`fi fi-${c.country}`" :title="c.countryName || c.country" class="node-flag" />
-          <span class="node-os">{{ osLabel(c) }}</span>
+          <span class="node-os">{{ c.agentVersion }}</span>
           <div class="node-actions" @click.stop>
             <el-button size="small" text :icon="Edit" @click="openEdit(c)" />
             <el-button size="small" text :icon="Setting" @click="openConfig(c)" />
@@ -108,7 +108,7 @@
             <span class="status-dot inline" :class="row.status" />{{ row.name }}
           </template>
         </el-table-column>
-        <el-table-column prop="hostname" label="主机名" min-width="120" />
+        <el-table-column prop="agentVersion" label="版本" min-width="120" />
         <el-table-column label="IP" width="160">
           <template #default="{ row }">
             <span v-if="row.country" :class="`fi fi-${row.country}`" :title="row.countryName || row.country" class="node-flag" />

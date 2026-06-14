@@ -6,7 +6,7 @@
       <span class="status-dot" :class="[client.status, { pulse: client.status === 'online' }]" />
       <div class="db-title">
         <div class="db-name">{{ client.name }}</div>
-        <div class="db-sub">{{ client.hostname }} · {{ client.os }}/{{ client.arch }} · {{ client.ipAddress || '-' }}<span v-if="client.agentVersion"> · {{ client.agentVersion }}</span></div>
+        <div class="db-sub">{{ client.hostname }} · {{ client.os }}/{{ client.arch }}/{{ client.osPlatform }} · {{ client.ipAddress || '-' }}<span v-if="client.agentVersion"> · {{ client.agentVersion }}</span></div>
       </div>
       <el-tag :type="statusType(client.status)" effect="light">{{ statusLabel(client.status) }}</el-tag>
       <span v-if="lastUpdate" class="last-upd">更新于 {{ lastUpdate }}</span>
