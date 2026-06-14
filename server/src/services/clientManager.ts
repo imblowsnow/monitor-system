@@ -130,7 +130,7 @@ class ClientManager {
   }
 
   /** 向指定在线 agent 下发自更新指令。离线返回 false。 */
-  pushUpdate(clientId: string, payload: { version: string; downloadUrl: string; checksum?: string }): boolean {
+  pushUpdate(clientId: string, payload: { version: string }): boolean {
     const client = this.clients.get(clientId);
     if (client && client.ws.readyState === WebSocket.OPEN) {
       client.ws.send(JSON.stringify({

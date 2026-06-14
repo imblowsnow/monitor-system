@@ -21,9 +21,9 @@ func scriptURL() string {
 // runScript 复用 install.sh 覆盖安装：参数为 TOKEN、SERVER_URL、DOWNLOAD_URL。
 // 更新场景下 TOKEN/SERVER_URL 传空，脚本会保留现有 config.json，仅替换二进制并重启服务。
 // 脚本重启服务后本进程会被 systemd/launchd 终止并以新二进制拉起。
-func runScript(script, downloadURL string) error {
+func runScript(script) error {
 	defer os.Remove(script) // 执行完即删临时脚本
-	cmd := exec.Command("sh", script, "", "", downloadURL)
+	cmd := exec.Command("sh", script, "", "")
 	cmd.Stdout = log.Writer()
 	cmd.Stderr = log.Writer()
 

@@ -42,13 +42,12 @@ export async function pushUpdate(req: Request, res: Response) {
     return;
   }
   const status = await buildStatus(client);
-  if (!status.latestVersion || !status.downloadUrl) {
+  if (!status.latestVersion) {
     res.status(404).json({ error: '未找到匹配当前平台的最新版本二进制' });
     return;
   }
   const sent = clientManager.pushUpdate(client.id, {
     version: status.latestVersion,
-    downloadUrl: status.downloadUrl,
   });
   if (!sent) {
     res.status(503).json({ error: 'Agent is offline' });

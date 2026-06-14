@@ -25,11 +25,7 @@ var mu sync.Mutex
 // Apply 执行一次自更新：实时拉取最新安装脚本，再以 downloadURL 为参数调用。
 // 平台相关的脚本 URL（scriptURL）与执行（runScript）分别在
 // updater_unix.go / updater_windows.go 中实现。
-func Apply(version, downloadURL, checksum string) error {
-	if downloadURL == "" {
-		return fmt.Errorf("downloadUrl 为空，忽略更新")
-	}
-
+func Apply(version string) error {
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -38,10 +34,10 @@ func Apply(version, downloadURL, checksum string) error {
 		return err
 	}
 
-	log.Printf("[updater] 开始更新到 %s: %s", version, downloadURL)
+	log.Printf("[updater] 开始更新到 %s", version)
 	// 临时脚本的清理由各平台 runScript 负责：unix 等脚本执行完后删除，
 	// windows 脚本为分离进程不能在此删（powershell 仍在读），交由其自行处理。
-	return runScript(script, downloadURL)
+	return runScript(script)
 }
 
 // fetchScript 从仓库下载最新安装脚本到临时文件，返回脚本路径。

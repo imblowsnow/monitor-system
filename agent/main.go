@@ -54,15 +54,13 @@ func main() {
 		payload, _ := json.Marshal(msg.Payload)
 		var req struct {
 			Version     string `json:"version"`
-			DownloadURL string `json:"downloadUrl"`
-			Checksum    string `json:"checksum"`
 		}
 		if err := json.Unmarshal(payload, &req); err != nil {
 			log.Printf("Invalid agent_update payload: %v", err)
 			return
 		}
 		log.Printf("Received update request: version=%s", req.Version)
-		if err := updater.Apply(req.Version, req.DownloadURL, req.Checksum); err != nil {
+		if err := updater.Apply(req.Version); err != nil {
 			log.Printf("Update failed: %v", err)
 		}
 	})

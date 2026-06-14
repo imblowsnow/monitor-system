@@ -27,12 +27,12 @@ func scriptURL() string {
 //
 // 临时脚本不能在本进程删除（powershell 仍在读），由脚本末尾自行清理：
 // 通过 -RemoveSelf 让脚本完成后删除自身。
-func runScript(script, downloadURL string) error {
+func runScript(script string) error {
 	cmd := exec.Command(
 		"powershell", "-NoProfile", "-NonInteractive",
 		"-ExecutionPolicy", "Bypass",
 		"-File", script,
-		"-Token", "", "-ServerUrl", "", "-DownloadUrl", downloadURL,
+		"-Token", "", "-ServerUrl", "",
 		"-RemoveSelf",
 	)
 	cmd.SysProcAttr = &syscall.SysProcAttr{
