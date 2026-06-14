@@ -1,6 +1,6 @@
 /** 固定的 agent 二进制来源仓库（不走后台配置）。 */
 const REPO = 'imblowsnow/monitor-system';
-const CACHE_TTL = 10 * 60 * 1000; // GitHub 匿名限流 60/h，缓存 10 分钟兜底。
+const CACHE_TTL = 60 * 1000; // GitHub 匿名限流 60/h，缓存 10 分钟兜底。
 
 export interface ReleaseInfo {
   /** Release 版本号（tag_name，如 v1.2.3）。 */
