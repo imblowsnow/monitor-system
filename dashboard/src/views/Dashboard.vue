@@ -85,6 +85,7 @@
           <div class="node-actions" @click.stop>
             <el-button size="small" text :icon="Edit" @click="openEdit(c)" />
             <el-button size="small" text :icon="Setting" @click="openConfig(c)" />
+            <el-button size="small" text type="warning" :icon="Download" @click="openInstall(c)" />
             <el-button size="small" text type="success" :icon="Platform" @click="openTerminal(c)" />
             <el-button size="small" text type="danger" :icon="Delete" @click="removeClient(c)" />
           </div>
@@ -128,11 +129,12 @@
             <HeartbeatBar :beats="getBeats(row.id)" :compact="true" />
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="340" fixed="right">
+        <el-table-column label="操作" width="400" fixed="right">
           <template #default="{ row }">
             <el-button size="small" @click="$router.push(`/admin/clients/${row.id}`)">详情</el-button>
             <el-button size="small" @click="openEdit(row)">编辑</el-button>
             <el-button size="small" @click="openConfig(row)">配置</el-button>
+            <el-button size="small" type="warning" @click="openInstall(row)">安装</el-button>
             <el-button size="small" type="success" @click="openTerminal(row)">终端</el-button>
             <el-button size="small" type="danger" @click="removeClient(row)">删除</el-button>
           </template>
@@ -176,6 +178,9 @@
         <el-button type="primary" @click="saveConfig" :disabled="configLoading">保存并下发</el-button>
       </template>
     </el-dialog>
+
+    <!-- 安装命令 -->
+    <InstallDialog v-model="showInstallDialog" :client="installTarget" />
   </div>
 </template>
 
@@ -185,11 +190,13 @@ import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import {
   CircleCheckFilled, CircleCloseFilled, WarningFilled, Histogram,
-  Search, Grid, List, Plus, Monitor, Platform, Top, Bottom, Delete, Edit, Setting,
+  Search, Grid, List, Plus, Monitor, Platform, Top, Bottom, Delete, Edit, Setting, Download,
 } from '@element-plus/icons-vue';
 import { useClientsStore } from '../stores/clients';
+import type { ClientInfo } from '../stores/clients';
 import api from '../api/index';
 import HeartbeatBar from '../components/HeartbeatBar.vue';
+import InstallDialog from '../components/InstallDialog.vue';
 import { buildBeats, uptimePercent, type Segment } from '../utils/format';
 
 const router = useRouter();
@@ -249,6 +256,15 @@ function uptimeOf(clientId: string) {
 
 function openTerminal(row: { id: string; name: string }) {
   router.push({ name: 'Terminal', query: { clientId: row.id, name: row.name } });
+}
+
+// ---------- 安装命令 ----------
+const showInstallDialog = ref(false);
+const installTarget = ref<ClientInfo | null>(null);
+
+function openInstall(row: ClientInfo) {
+  installTarget.value = row;
+  showInstallDialog.value = true;
 }
 
 // ---------- 添加 / 编辑 ----------

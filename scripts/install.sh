@@ -64,7 +64,42 @@ cat > "$INSTALL_DIR/config.json" <<EOF
 }
 EOF
 
-cat > /etc/systemd/system/$SERVICE_NAME.service <<EOF
+OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
+
+if [ "$OS" = "darwin" ]; then
+  # macOS 使用 launchd 注册开机自启
+  PLIST="/Library/LaunchDaemons/com.${SERVICE_NAME}.plist"
+  cat > "$PLIST" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.${SERVICE_NAME}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>$INSTALL_DIR/monitor-agent</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>$INSTALL_DIR</string>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>$INSTALL_DIR/agent.log</string>
+  <key>StandardErrorPath</key>
+  <string>$INSTALL_DIR/agent.err.log</string>
+</dict>
+</plist>
+EOF
+  launchctl unload "$PLIST" 2>/dev/null || true
+  launchctl load "$PLIST"
+  echo "Monitor Agent installed and started (launchd)."
+  echo "Status: sudo launchctl list | grep ${SERVICE_NAME}"
+else
+  # Linux 使用 systemd
+  cat > /etc/systemd/system/$SERVICE_NAME.service <<EOF
 [Unit]
 Description=Monitor Agent
 After=network.target
@@ -82,9 +117,10 @@ StandardError=journal
 WantedBy=multi-user.target
 EOF
 
-systemctl daemon-reload
-systemctl enable $SERVICE_NAME
-systemctl start $SERVICE_NAME
+  systemctl daemon-reload
+  systemctl enable $SERVICE_NAME
+  systemctl start $SERVICE_NAME
 
-echo "Monitor Agent installed and started."
-echo "Status: systemctl status $SERVICE_NAME"
+  echo "Monitor Agent installed and started."
+  echo "Status: systemctl status $SERVICE_NAME"
+fi

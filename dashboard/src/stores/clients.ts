@@ -18,6 +18,7 @@ export interface ClientInfo {
   status: 'online' | 'warning' | 'offline';
   tags: string[];
   sortOrder?: number;
+  token?: string;
 }
 
 export const useClientsStore = defineStore('clients', () => {
