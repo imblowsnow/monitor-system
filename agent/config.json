@@ -1,0 +1,6 @@
+{
+  "server_url": "ws://localhost:42000/ws/agent",
+  "token": "f1f766408a6dd52e58b762e00eec6f2456405a664802d50190b2874eb41c4ded",
+  "client_id": "server-01",
+  "interval": 5
+}

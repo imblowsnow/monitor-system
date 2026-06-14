@@ -1,0 +1,24 @@
+export const HEARTBEAT_INTERVAL = 5_000;
+export const WARNING_THRESHOLD = 15_000;
+export const OFFLINE_THRESHOLD = 30_000;
+export const HEALTH_CHECK_INTERVAL = 5_000;
+
+export const METRICS_COLLECT_INTERVAL = 10_000;
+export const METRICS_REPORT_INTERVAL = 30_000;
+
+export const RECONNECT_BASE_DELAY = 1_000;
+export const RECONNECT_MAX_DELAY = 60_000;
+export const RECONNECT_BACKOFF_FACTOR = 2;
+export const RECONNECT_JITTER = 0.3;
+
+export const MESSAGE_QUEUE_MAX_SIZE = 1000;
+
+export const TERMINAL_MAX_SESSIONS = 5;
+export const TERMINAL_IDLE_TIMEOUT = 30 * 60 * 1000;
+
+export const FILE_CHUNK_SIZE = 64 * 1024;
+export const FILE_BACKPRESSURE_THRESHOLD = 256 * 1024;
+
+export const COMMAND_DEFAULT_TIMEOUT = 30_000;
+
+export const JWT_EXPIRY = '24h';
