@@ -4,13 +4,20 @@ import { randomBytes } from 'crypto';
 import { Client, StatusLog } from '../db/models.js';
 import { clientManager } from '../services/clientManager.js';
 
+/** 节点无实时连接时,据是否有历史状态记录判定 offline(有记录)或 empty(从未上报)。 */
+async function resolveStatus(clientId: string, liveStatus?: string): Promise<string> {
+  if (liveStatus) return liveStatus;
+  const hasLog = await StatusLog.findOne({ where: { clientId }, attributes: ['id'] });
+  return hasLog ? 'offline' : 'empty';
+}
+
 export async function getClients(req: Request, res: Response) {
   const dbClients = await Client.findAll({ order: [['sortOrder', 'ASC'], ['createdAt', 'DESC']] });
   const onlineStates = clientManager.getAllClients();
-  const result = dbClients.map(c => {
+  const result = await Promise.all(dbClients.map(async (c) => {
     const state = onlineStates.find(s => s.clientId === c.id);
-    return { ...c.toJSON(), status: state?.status || 'offline' };
-  });
+    return { ...c.toJSON(), status: await resolveStatus(c.id, state?.status) };
+  }));
   res.json(result);
 }
 
@@ -30,7 +37,7 @@ export async function getClient(req: Request, res: Response) {
     return;
   }
   const state = clientManager.getClientState(client.id);
-  res.json({ ...client.toJSON(), status: state?.status || 'offline' });
+  res.json({ ...client.toJSON(), status: await resolveStatus(client.id, state?.status) });
 }
 
 export async function createClient(req: Request, res: Response) {
@@ -78,16 +85,17 @@ export async function getGroups(_req: Request, res: Response) {
   res.json(groups.map(g => g.groupName));
 }
 
-/** 统计一段状态时间线的可用率(online 时长占比,%)。 */
-function calcUptimePercent(timeline: Array<{ status: string; start: string; end: string }>) {
+/** 统计一段状态时间线的可用率(online 时长占比,%)。无任何真实数据时返回 null。 */
+function calcUptimePercent(timeline: Array<{ status: string; start: string; end: string }>): number | null {
   let online = 0;
   let total = 0;
   for (const seg of timeline) {
+    if (seg.status === 'empty') continue; // 无数据段不参与可用率计算
     const dur = new Date(seg.end).getTime() - new Date(seg.start).getTime();
     total += dur;
     if (seg.status === 'online') online += dur;
   }
-  if (!total) return 100;
+  if (!total) return null;
   return Math.round((online / total) * 1000) / 10;
 }
 
@@ -106,7 +114,12 @@ async function buildTimeline(clientId: string, hours: number) {
   const timeline: Array<{ status: string; start: string; end: string }> = [];
   const startTime = since.toISOString();
   const endTime = new Date().toISOString();
-  const initialStatus = lastBefore?.status ?? 'offline';
+  // 是否存在任何真实状态记录:窗口内有日志,或窗口前有过日志。
+  // 二者皆无 = 该节点从未上报过,属于「无数据」,不能当成离线(红色)。
+  const hasData = logs.length > 0 || !!lastBefore;
+  // 首段(窗口开始 → 第一条日志)只有在窗口之前确实有记录时才沿用其状态;
+  // 否则该时段节点尚未上报过,属于「无数据」(灰),不能当成离线(红)。
+  const initialStatus = lastBefore?.status ?? 'empty';
 
   if (logs.length === 0) {
     timeline.push({ status: initialStatus, start: startTime, end: endTime });
@@ -117,7 +130,7 @@ async function buildTimeline(clientId: string, hours: number) {
       timeline.push({ status: logs[i].status, start: (logs[i].timestamp as Date).toISOString(), end });
     }
   }
-  return { since: startTime, until: endTime, timeline };
+  return { since: startTime, until: endTime, timeline, hasData };
 }
 
 /**
@@ -135,12 +148,14 @@ export async function getPublicStatus(req: Request, res: Response) {
 
   const result = await Promise.all(dbClients.map(async (c) => {
     const state = onlineStates.find(s => s.clientId === c.id);
-    const { timeline } = await buildTimeline(c.id, hours);
+    const { timeline, hasData } = await buildTimeline(c.id, hours);
+    // 实时无连接且历史无记录 = 从未上报,标记为 empty(无数据),前台显示灰色。
+    const status = state?.status || (hasData ? 'offline' : 'empty');
     return {
       id: c.id,
       name: c.name,
       group: c.groupName,
-      status: state?.status || 'offline',
+      status,
       uptime: calcUptimePercent(timeline),
       timeline,
     };
@@ -162,7 +177,7 @@ export async function getPublicClientStatus(req: Request, res: Response) {
   }
   const hours = Math.min(Number(req.query.hours) || 24, 24 * 90);
   const state = clientManager.getClientState(client.id);
-  const { since, until, timeline } = await buildTimeline(client.id, hours);
+  const { since, until, timeline, hasData } = await buildTimeline(client.id, hours);
 
   // 额外给出 24h / 7d / 30d 三档可用率,供详情页概览展示。
   const [d1, d7, d30] = await Promise.all([
@@ -175,7 +190,7 @@ export async function getPublicClientStatus(req: Request, res: Response) {
     id: client.id,
     name: client.name,
     group: client.groupName,
-    status: state?.status || 'offline',
+    status: state?.status || (hasData ? 'offline' : 'empty'),
     since,
     until,
     timeline,
@@ -206,7 +221,7 @@ export async function getUptimeTimeline(req: Request, res: Response) {
   const startTime = since.toISOString();
   const endTime = new Date().toISOString();
 
-  const initialStatus = lastBefore?.status ?? 'offline';
+  const initialStatus = lastBefore?.status ?? 'empty';
 
   if (logs.length === 0) {
     timeline.push({ status: initialStatus, start: startTime, end: endTime });

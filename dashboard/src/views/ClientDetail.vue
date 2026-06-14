@@ -53,7 +53,7 @@
     <div class="surface panel">
       <div class="panel-head">
         <h3>{{ hbRangeLabel }}在线状态</h3>
-        <span class="pct" :class="client.status">{{ uptimeOf }}%</span>
+        <span class="pct" :class="client.status">{{ uptimeOf == null ? '—' : uptimeOf + '%' }}</span>
       </div>
       <HeartbeatBar :beats="beats" />
       <div class="tl-foot"><span>{{ hbRangeLabel }}前</span><span>现在</span></div>
@@ -231,9 +231,10 @@ const collectorTime = computed(() => (latest.value.collectedAt ? formatTime(late
 // 头部"最后更新时间"，与最近一条指标的采集时间一致
 const lastUpdate = collectorTime;
 
-function statusType(status: string): 'success' | 'warning' | 'danger' {
+function statusType(status: string): 'success' | 'warning' | 'danger' | 'info' {
   if (status === 'online') return 'success';
   if (status === 'warning') return 'warning';
+  if (status === 'empty') return 'info';
   return 'danger';
 }
 
@@ -509,6 +510,7 @@ onUnmounted(() => {
 .pct.online { color: var(--c-up); }
 .pct.warning { color: var(--c-warn); }
 .pct.offline { color: var(--c-down); }
+.pct.empty { color: var(--text-3); }
 .tl-foot {
   display: flex;
   justify-content: space-between;

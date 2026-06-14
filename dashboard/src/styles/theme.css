@@ -159,6 +159,9 @@ body {
   background: var(--c-down);
   box-shadow: 0 0 0 3px var(--c-down-soft);
 }
+.status-dot.empty {
+  background: var(--c-empty);
+}
 .status-dot.online.pulse {
   animation: dot-pulse 2s infinite;
 }

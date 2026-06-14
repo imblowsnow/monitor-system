@@ -9,8 +9,8 @@ export interface PublicServer {
   id: string;
   name: string;
   group: string;
-  status: 'online' | 'warning' | 'offline';
-  uptime: number;
+  status: 'online' | 'warning' | 'offline' | 'empty';
+  uptime: number | null;
   timeline: Array<{ status: string; start: string; end: string }>;
 }
 
@@ -18,11 +18,11 @@ export interface PublicServerDetail {
   id: string;
   name: string;
   group: string;
-  status: 'online' | 'warning' | 'offline';
+  status: 'online' | 'warning' | 'offline' | 'empty';
   since: string;
   until: string;
   timeline: Array<{ status: string; start: string; end: string }>;
-  uptime: { day: number; week: number; month: number };
+  uptime: { day: number | null; week: number | null; month: number | null };
 }
 
 export async function fetchPublicStatus(hours = 24): Promise<PublicServer[]> {

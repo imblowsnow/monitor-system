@@ -15,7 +15,7 @@ export interface ClientInfo {
   countryName?: string;
   groupName: string;
   agentVersion: string;
-  status: 'online' | 'warning' | 'offline';
+  status: 'online' | 'warning' | 'offline' | 'empty';
   tags: string[];
   sortOrder?: number;
   token?: string;
@@ -38,7 +38,7 @@ export const useClientsStore = defineStore('clients', () => {
     }
   }
 
-  function updateStatus(clientId: string, status: 'online' | 'warning' | 'offline') {
+  function updateStatus(clientId: string, status: 'online' | 'warning' | 'offline' | 'empty') {
     const client = clients.value.find(c => c.id === clientId);
     if (client) {
       client.status = status;

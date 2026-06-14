@@ -56,16 +56,17 @@ export function statusLabel(status: string): string {
   }
 }
 
-/** 由状态时间线计算 online 时长占比(%)。 */
-export function uptimePercent(timeline: Segment[]): number {
+/** 由状态时间线计算 online 时长占比(%)。无任何真实数据时返回 null。 */
+export function uptimePercent(timeline: Segment[]): number | null {
   let online = 0;
   let total = 0;
   for (const seg of timeline) {
+    if (seg.status === 'empty') continue; // 无数据段不计入
     const dur = new Date(seg.end).getTime() - new Date(seg.start).getTime();
     total += dur;
     if (seg.status === 'online') online += dur;
   }
-  if (!total) return 100;
+  if (!total) return null;
   return Math.round((online / total) * 1000) / 10;
 }
 

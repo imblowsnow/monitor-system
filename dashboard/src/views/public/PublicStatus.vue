@@ -29,7 +29,7 @@
           <p>{{ servers.length }} 个服务 · {{ onlineCount }} 个在线 · 最近更新 {{ updatedAt }}</p>
         </div>
         <div class="overall-uptime">
-          <div class="ou-num">{{ overallUptime }}%</div>
+          <div class="ou-num">{{ overallUptime === '—' ? '—' : overallUptime + '%' }}</div>
           <div class="ou-label">{{ hbRangeLabel }}整体可用率</div>
         </div>
       </section>
@@ -81,7 +81,7 @@
                     <div class="sc-name">{{ s.name }}</div>
                     <div class="sc-status" :class="s.status">{{ statusLabel(s.status) }}</div>
                   </div>
-                  <div class="sc-uptime" :class="uptimeClass(s.uptime)">{{ s.uptime }}%</div>
+                  <div class="sc-uptime" :class="uptimeClass(s.uptime)">{{ uptimeText(s.uptime) }}</div>
                 </div>
                 <HeartbeatBar :beats="beatsOf(s)" />
                 <div class="sc-foot">
@@ -157,9 +157,10 @@ const groupedServers = computed(() => {
 });
 
 const overallUptime = computed(() => {
-  if (!servers.value.length) return '100.0';
-  const sum = servers.value.reduce((acc, s) => acc + s.uptime, 0);
-  return (sum / servers.value.length).toFixed(1);
+  const vals = servers.value.map(s => s.uptime).filter((v): v is number => v != null);
+  if (!vals.length) return '—';
+  const sum = vals.reduce((acc, v) => acc + v, 0);
+  return (sum / vals.length).toFixed(1);
 });
 
 const overallClass = computed(() => {
@@ -186,10 +187,15 @@ function beatsOf(s: PublicServer) {
   return buildBeats(s.timeline || [], 44, HB_RANGES[hbRange.value].hours);
 }
 
-function uptimeClass(v: number) {
+function uptimeClass(v: number | null) {
+  if (v == null) return 'empty';
   if (v >= 99) return 'online';
   if (v >= 90) return 'warning';
   return 'offline';
+}
+
+function uptimeText(v: number | null) {
+  return v == null ? '—' : `${v}%`;
 }
 
 function goDetail(id: string) {
@@ -471,6 +477,9 @@ onUnmounted(() => {
 .sc-status.offline {
   color: var(--c-down);
 }
+.sc-status.empty {
+  color: var(--text-3);
+}
 .sc-uptime {
   font-size: 16px;
   font-weight: 700;
@@ -483,6 +492,9 @@ onUnmounted(() => {
 }
 .sc-uptime.offline {
   color: var(--c-down);
+}
+.sc-uptime.empty {
+  color: var(--text-3);
 }
 .sc-foot {
   display: flex;

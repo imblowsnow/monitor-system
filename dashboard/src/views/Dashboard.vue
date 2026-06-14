@@ -26,7 +26,7 @@
       <div class="stat-card">
         <div class="stat-icon total"><el-icon><Histogram /></el-icon></div>
         <div class="stat-body">
-          <div class="stat-num">{{ overallUptime }}%</div>
+          <div class="stat-num">{{ overallUptime === '—' ? '—' : overallUptime + '%' }}</div>
           <div class="stat-label">整体可用率 (24h)</div>
         </div>
       </div>
@@ -75,7 +75,7 @@
             <div class="node-name">{{ c.name }}</div>
             <div class="node-sub">{{ c.hostname || c.ipAddress || '-' }}</div>
           </div>
-          <div class="node-uptime" :class="c.status">{{ uptimeOf(c.id) }}%</div>
+          <div class="node-uptime" :class="c.status">{{ uptimeText(c.id) }}</div>
         </div>
         <HeartbeatBar :beats="getBeats(c.id)" />
         <div class="node-foot">
@@ -121,7 +121,7 @@
         <el-table-column prop="groupName" label="分组" width="110" />
         <el-table-column label="24h 可用率" width="110">
           <template #default="{ row }">
-            <span :class="['pct', row.status]">{{ uptimeOf(row.id) }}%</span>
+            <span :class="['pct', row.status]">{{ uptimeText(row.id) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="24h 在线" min-width="220">
@@ -240,10 +240,12 @@ const filteredClients = computed(() =>
 );
 
 const overallUptime = computed(() => {
-  const ids = clientsStore.clients.map(c => c.id);
-  if (!ids.length) return '100.0';
-  const sum = ids.reduce((acc, id) => acc + uptimeOf(id), 0);
-  return (sum / ids.length).toFixed(1);
+  const vals = clientsStore.clients
+    .map(c => uptimeOf(c.id))
+    .filter((v): v is number => v != null);
+  if (!vals.length) return '—';
+  const sum = vals.reduce((acc, v) => acc + v, 0);
+  return (sum / vals.length).toFixed(1);
 });
 
 function getBeats(clientId: string) {
@@ -252,6 +254,11 @@ function getBeats(clientId: string) {
 
 function uptimeOf(clientId: string) {
   return uptimePercent(uptimeMap.value[clientId] || []);
+}
+
+function uptimeText(clientId: string) {
+  const v = uptimeOf(clientId);
+  return v == null ? '—' : `${v}%`;
 }
 
 function openTerminal(row: { id: string; name: string }) {
@@ -483,6 +490,7 @@ onMounted(async () => {
 .node-uptime.online { color: var(--c-up); }
 .node-uptime.warning { color: var(--c-warn); }
 .node-uptime.offline { color: var(--c-down); }
+.node-uptime.empty { color: var(--text-3); }
 .node-foot {
   display: flex; align-items: center; gap: 10px;
   margin-top: 14px; font-size: 12px; color: var(--text-3);
@@ -498,6 +506,7 @@ onMounted(async () => {
 .pct.online { color: var(--c-up); font-weight: 600; }
 .pct.warning { color: var(--c-warn); font-weight: 600; }
 .pct.offline { color: var(--c-down); font-weight: 600; }
+.pct.empty { color: var(--text-3); font-weight: 600; }
 
 .list-card { padding: 8px 12px; }
 .empty { grid-column: 1 / -1; }

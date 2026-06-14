@@ -28,15 +28,15 @@
         <!-- 可用率三档 -->
         <section class="uptime-cards">
           <div class="uc">
-            <div class="uc-num" :class="uptimeClass(detail.uptime.day)">{{ detail.uptime.day }}%</div>
+            <div class="uc-num" :class="uptimeClass(detail.uptime.day)">{{ uptimeText(detail.uptime.day) }}</div>
             <div class="uc-label">24 小时</div>
           </div>
           <div class="uc">
-            <div class="uc-num" :class="uptimeClass(detail.uptime.week)">{{ detail.uptime.week }}%</div>
+            <div class="uc-num" :class="uptimeClass(detail.uptime.week)">{{ uptimeText(detail.uptime.week) }}</div>
             <div class="uc-label">7 天</div>
           </div>
           <div class="uc">
-            <div class="uc-num" :class="uptimeClass(detail.uptime.month)">{{ detail.uptime.month }}%</div>
+            <div class="uc-num" :class="uptimeClass(detail.uptime.month)">{{ uptimeText(detail.uptime.month) }}</div>
             <div class="uc-label">30 天</div>
           </div>
         </section>
@@ -96,10 +96,15 @@ const rangeLabel = computed(() => {
   return '30 天';
 });
 
-function uptimeClass(v: number) {
+function uptimeClass(v: number | null) {
+  if (v == null) return 'empty';
   if (v >= 99) return 'online';
   if (v >= 90) return 'warning';
   return 'offline';
+}
+
+function uptimeText(v: number | null) {
+  return v == null ? '—' : `${v}%`;
 }
 
 async function load() {
@@ -197,6 +202,9 @@ onUnmounted(() => {
 .dh-status.offline {
   color: var(--c-down);
 }
+.dh-status.empty {
+  color: var(--text-3);
+}
 .dot-sep {
   color: var(--text-3);
 }
@@ -229,6 +237,9 @@ onUnmounted(() => {
 }
 .uc-num.offline {
   color: var(--c-down);
+}
+.uc-num.empty {
+  color: var(--text-3);
 }
 .uc-label {
   margin-top: 8px;
