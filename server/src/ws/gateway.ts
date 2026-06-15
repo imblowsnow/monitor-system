@@ -12,6 +12,25 @@ import { updateCommandResult } from '../services/commandService.js';
 import { Client } from '../db/models.js';
 import jwt from 'jsonwebtoken';
 
+/**
+ * 提取客户端真实 IP。
+ * 服务端若位于反向代理（nginx / cloudflare 等）之后，socket.remoteAddress 取到的是代理的内网 IP，
+ * 真实外网 IP 在 X-Forwarded-For / X-Real-IP 头中。X-Forwarded-For 可能是逗号分隔的链路，取第一个（最初客户端）。
+ */
+function getRealIp(req: IncomingMessage): string {
+  const xff = req.headers['x-forwarded-for'];
+  if (xff) {
+    const first = (Array.isArray(xff) ? xff[0] : xff).split(',')[0]?.trim();
+    if (first) return first.replace(/^::ffff:/, '');
+  }
+  const xri = req.headers['x-real-ip'];
+  if (xri) {
+    const v = (Array.isArray(xri) ? xri[0] : xri).trim();
+    if (v) return v.replace(/^::ffff:/, '');
+  }
+  return (req.socket.remoteAddress || '').replace(/^::ffff:/, '');
+}
+
 export function createAgentWss(server: any): WebSocketServer {
   const wss = new WebSocketServer({ noServer: true });
 
@@ -57,7 +76,7 @@ export function createAgentWss(server: any): WebSocketServer {
         clearTimeout(authTimeout);
         authenticated = true;
 
-        const remoteIp = req.socket.remoteAddress || '';
+        const remoteIp = getRealIp(req);
         await client.update({
           hostname: payload.hostname,
           os: payload.os,
