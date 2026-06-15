@@ -374,14 +374,16 @@ async function moveClient(index: number, dir: 1 | -1) {
 }
 
 async function fetchUptime() {
-  for (const c of clientsStore.clients) {
-    try {
-      const { data } = await api.get(`/clients/${c.id}/uptime?hours=24`);
-      uptimeMap.value[c.id] = data.timeline || [];
-    } catch {
-      // 忽略单节点失败
-    }
-  }
+  await Promise.all(
+    clientsStore.clients.map(async (c) => {
+      try {
+        const { data } = await api.get(`/clients/${c.id}/uptime?hours=24`);
+        uptimeMap.value[c.id] = data.timeline || [];
+      } catch {
+        // 忽略单节点失败
+      }
+    })
+  );
 }
 
 onMounted(async () => {
