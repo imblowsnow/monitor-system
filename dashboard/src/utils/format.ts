@@ -70,9 +70,21 @@ export function uptimePercent(timeline: Segment[]): number | null {
   return Math.round((online / total) * 1000) / 10;
 }
 
+// 状态严重度:数值越大越严重。用于在一个时间槽内取「最差」状态,避免漏掉异常。
+const STATUS_SEVERITY: Record<string, number> = {
+  empty: 0,
+  online: 1,
+  warning: 2,
+  offline: 3,
+};
+
 /**
  * 把状态时间线离散成 N 段心跳条。
  * windowHours: 时间窗口(小时);count: 心跳格数。
+ *
+ * 每个心跳格代表一段时间(windowHours/count),取该段内「最严重」的状态:
+ * 只要这段时间里出现过 offline/warning,格子就会标红/标黄,不会因为采样点
+ * 恰好落在正常区间而把异常跳过。
  */
 export function buildBeats(timeline: Segment[], count = 40, windowHours = 24): Beat[] {
   const now = Date.now();
@@ -82,17 +94,20 @@ export function buildBeats(timeline: Segment[], count = 40, windowHours = 24): B
   const beats: Beat[] = [];
 
   for (let i = 0; i < count; i++) {
-    const mid = start + slot * i + slot / 2;
+    const slotStart = start + slot * i;
+    const slotEnd = slotStart + slot;
     let status = 'empty';
     for (const seg of timeline) {
       const s = new Date(seg.start).getTime();
       const e = new Date(seg.end).getTime();
-      if (mid >= s && mid < e) {
-        status = seg.status;
-        break;
+      // 该段与当前时间槽有重叠
+      if (s < slotEnd && e > slotStart) {
+        if ((STATUS_SEVERITY[seg.status] ?? 0) > (STATUS_SEVERITY[status] ?? 0)) {
+          status = seg.status;
+        }
       }
     }
-    const ts = formatDateTime(start + slot * i);
+    const ts = formatDateTime(slotStart);
     beats.push({ status, tooltip: `${ts} · ${statusLabel(status)}` });
   }
   return beats;
