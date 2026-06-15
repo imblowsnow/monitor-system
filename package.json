@@ -21,13 +21,6 @@
   "engines": {
     "node": ">=20.0.0"
   },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "sqlite3",
-      "esbuild",
-      "vue-demi"
-    ]
-  },
   "devDependencies": {
     "cross-env": "^10.1.0"
   }
