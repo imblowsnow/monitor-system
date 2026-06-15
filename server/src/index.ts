@@ -44,7 +44,7 @@ async function main() {
 
   clientManager.start();
   terminalService.start();
-  alertService.start();
+  await alertService.start();
   await cronService.start();
   await cleanupService.start();
   aggregateService.start();

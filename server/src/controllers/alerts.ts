@@ -27,11 +27,13 @@ export async function deleteRule(req: Request, res: Response) {
 }
 
 export async function getEvents(req: Request, res: Response) {
-  const limit = parseInt(req.query.limit as string) || 100;
-  const events = await AlertEvent.findAll({
+  const page = parseInt(req.query.page as string) || 1;
+  const pageSize = parseInt(req.query.pageSize as string) || 20;
+  const { rows, count } = await AlertEvent.findAndCountAll({
     order: [['triggeredAt', 'DESC']],
-    limit,
+    offset: (page - 1) * pageSize,
+    limit: pageSize,
     include: [AlertRule, Client],
   });
-  res.json(events);
+  res.json({ rows, total: count });
 }

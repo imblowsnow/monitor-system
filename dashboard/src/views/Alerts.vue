@@ -82,6 +82,14 @@
           <template #default="{ row }">{{ new Date(row.triggeredAt).toLocaleString('zh-CN') }}</template>
         </el-table-column>
       </el-table>
+      <el-pagination
+        class="pager"
+        layout="total, prev, pager, next"
+        :total="eventsTotal"
+        :page-size="eventsPageSize"
+        :current-page="eventsPage"
+        @current-change="onEventsPageChange"
+      />
     </div>
 
     <!-- 规则编辑对话框 -->
@@ -158,6 +166,9 @@ const activeTab = ref('rules');
 
 const rules = ref<any[]>([]);
 const events = ref<any[]>([]);
+const eventsTotal = ref(0);
+const eventsPage = ref(1);
+const eventsPageSize = ref(20);
 const groups = ref<string[]>([]);
 const channels = ref<Channel[]>([]);
 const loading = ref(false);
@@ -322,8 +333,15 @@ async function fetchRules() {
   loading.value = false;
 }
 async function fetchEvents() {
-  const { data } = await api.get('/alerts/events');
-  events.value = data;
+  const { data } = await api.get('/alerts/events', {
+    params: { page: eventsPage.value, pageSize: eventsPageSize.value },
+  });
+  events.value = data.rows;
+  eventsTotal.value = data.total;
+}
+function onEventsPageChange(page: number) {
+  eventsPage.value = page;
+  fetchEvents();
 }
 async function fetchChannels() {
   channelLoading.value = true;
@@ -350,4 +368,5 @@ onMounted(async () => {
 .panel { padding: 18px 20px; }
 .panel-head { margin-bottom: 14px; }
 .panel-head h3 { margin: 0; font-size: 15px; font-weight: 600; color: var(--text-1); }
+.pager { margin-top: 14px; display: flex; justify-content: flex-end; }
 </style>

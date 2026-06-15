@@ -13,9 +13,32 @@ interface AlertState {
 class AlertService {
   private states = new Map<string, AlertState>();
   private timer: ReturnType<typeof setInterval> | null = null;
+  private startedAt = Date.now();
 
-  start() {
+  // agent 在服务重启后需要时间重连;此窗口内不做离线判定,
+  // 避免把"尚未重连"误判为"离线"而触发一波误报。
+  private readonly STARTUP_GRACE_MS = 60_000;
+
+  async start() {
+    await this.hydrateStates();
+    this.startedAt = Date.now();
     this.timer = setInterval(() => this.check(), 10_000);
+  }
+
+  // 从 DB 回灌未恢复的 firing 事件:states 是纯内存的,重启会丢失。
+  // 不回灌的话,这些事件在节点恢复时找不到内存 state,resolveAlert 永远
+  // 不会执行,DB 记录会永久卡在 firing。
+  private async hydrateStates() {
+    const open = await AlertEvent.findAll({ where: { status: 'firing' } });
+    for (const ev of open) {
+      const key = `${ev.ruleId}:${ev.clientId}`;
+      this.states.set(key, {
+        ruleId: ev.ruleId,
+        clientId: ev.clientId,
+        firstTriggered: new Date(ev.triggeredAt).getTime(),
+        fired: true,
+      });
+    }
   }
 
   stop() {
@@ -79,6 +102,8 @@ class AlertService {
 
   private async getCurrentValue(metric: string, clientId: string): Promise<number | null> {
     if (metric === 'offline') {
+      // 启动宽限期内不判离线:agent 还在陆续重连,此时 map 为空会误判一批离线。
+      if (Date.now() - this.startedAt < this.STARTUP_GRACE_MS) return null;
       const state = clientManager.getClientState(clientId);
       // 断连时 agent 会被移出连接表(getClientState 返回 undefined),
       // 这种情况同样算离线;只有确实在线(status==='online')才算 0。
