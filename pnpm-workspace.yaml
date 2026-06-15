@@ -2,3 +2,13 @@ packages:
   - "packages/*"
   - "server"
   - "dashboard"
+
+# pnpm 11 从此处读取构建批准列表(不再读 package.json 的 pnpm 字段)
+onlyBuiltDependencies:
+  - sqlite3
+  - esbuild
+  - vue-demi
+
+# 关闭执行 script 前自动 install 校验,避免阻断 start/deploy
+verifyDepsBeforeRun: false
+
