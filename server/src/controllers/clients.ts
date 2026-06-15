@@ -48,11 +48,14 @@ export async function createClient(req: Request, res: Response) {
   }
   // token 由后台自动生成，不由前端传入
   const token = randomBytes(32).toString('hex');
+  // 新增节点排在最后:取当前最大 sortOrder + 1
+  const maxOrder = (await Client.max('sortOrder')) as number | null;
   const client = await Client.create({
     name,
     groupName: groupName || 'default',
     token,
     tags: Array.isArray(tags) ? tags : [],
+    sortOrder: (typeof maxOrder === 'number' ? maxOrder : 0) + 1,
   });
   res.status(201).json(client);
 }

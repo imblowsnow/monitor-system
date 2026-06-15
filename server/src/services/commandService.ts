@@ -8,7 +8,8 @@ export async function executeCommand(
   dbClientId: string,
   command: string,
   timeout: number,
-  executedBy: string
+  executedBy: string,
+  taskId?: string
 ): Promise<{ id: string; sent: boolean }> {
   const ws = clientManager.getAgentWs(clientId);
   if (!ws) {
@@ -27,6 +28,7 @@ export async function executeCommand(
 
   await CommandLog.create({
     clientId: dbClientId,
+    taskId: taskId ?? null,
     command,
     executedBy,
     executedAt: new Date(),

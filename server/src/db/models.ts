@@ -90,6 +90,7 @@ Metric.init({
 export class CommandLog extends Model {
   declare id: number;
   declare clientId: string;
+  declare taskId: string | null;
   declare command: string;
   declare exitCode: number | null;
   declare stdout: string | null;
@@ -106,6 +107,9 @@ CommandLog.init({
     primaryKey: true,
   },
   clientId: {
+    type: DataTypes.UUID,
+  },
+  taskId: {
     type: DataTypes.UUID,
   },
   command: {
@@ -239,6 +243,7 @@ export class ScheduledTask extends Model {
   declare cronExpression: string;
   declare command: string;
   declare targetGroups: string[] | null;
+  declare targetClients: string[] | null;
   declare enabled: boolean;
   declare lastRunAt: Date | null;
   declare createdAt: Date;
@@ -263,6 +268,9 @@ ScheduledTask.init({
     allowNull: false,
   },
   targetGroups: {
+    type: DataTypes.JSON,
+  },
+  targetClients: {
     type: DataTypes.JSON,
   },
   enabled: {

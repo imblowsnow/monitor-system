@@ -7,10 +7,10 @@ const DEFAULT_DATA = {
 };
 
 const SEED_NODES = [
-  { name: '中国电信', target: 'gd-ct-dualstack.ip.zstaticcdn.com', probe: 'http', isp: 'CT', sortOrder: 1 },
-  { name: '中国联通', target: 'gd-cu-dualstack.ip.zstaticcdn.com', probe: 'http', isp: 'CU', sortOrder: 2 },
-  { name: '中国移动', target: 'gd-cm-dualstack.ip.zstaticcdn.com', probe: 'http', isp: 'CM', sortOrder: 3 },
-  { name: 'BD', target: 'lf3-ips.zstaticcdn.com', probe: 'http', isp: 'BD', sortOrder: 4 },
+  { name: '中国电信', target: 'gd-ct-dualstack.ip.zstaticcdn.com', probe: 'icmp', isp: 'CT', sortOrder: 1 },
+  { name: '中国联通', target: 'gd-cu-dualstack.ip.zstaticcdn.com', probe: 'icmp', isp: 'CU', sortOrder: 2 },
+  { name: '中国移动', target: 'gd-cm-dualstack.ip.zstaticcdn.com', probe: 'icmp', isp: 'CM', sortOrder: 3 },
+  { name: 'BD', target: 'lf3-ips.zstaticcdn.com', probe: 'icmp', isp: 'BD', sortOrder: 4 },
 ];
 
 /** 首次启动若节点表为空则插入默认节点。 */
