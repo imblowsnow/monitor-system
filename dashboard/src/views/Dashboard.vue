@@ -149,7 +149,10 @@
           <el-input v-model="editForm.name" />
         </el-form-item>
         <el-form-item label="分组">
-          <el-input v-model="editForm.groupName" placeholder="default" />
+          <el-select v-model="editForm.groupName" filterable allow-create default-first-option
+            placeholder="选择或输入分组" style="width: 100%">
+            <el-option v-for="g in groups" :key="g" :label="g" :value="g" />
+          </el-select>
         </el-form-item>
         <el-form-item label="标签">
           <el-select v-model="editForm.tags" multiple filterable allow-create default-first-option

@@ -77,6 +77,12 @@
               >
                 <div class="sc-head">
                   <span class="status-dot" :class="[s.status, { pulse: s.status === 'online' }]" />
+                  <span
+                    v-if="s.country"
+                    :class="`fi fi-${s.country}`"
+                    :title="s.countryName || s.country"
+                    class="sc-flag"
+                  />
                   <div class="sc-title">
                     <div class="sc-name">{{ s.name }}</div>
                     <div class="sc-status" :class="s.status">{{ statusLabel(s.status) }}</div>
@@ -455,6 +461,13 @@ onUnmounted(() => {
 .sc-title {
   flex: 1;
   min-width: 0;
+}
+.sc-flag {
+  width: 22px;
+  height: 16px;
+  border-radius: 3px;
+  flex: none;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08);
 }
 .sc-name {
   font-size: 15px;

@@ -141,7 +141,7 @@ async function buildTimeline(clientId: string, hours: number) {
 export async function getPublicStatus(req: Request, res: Response) {
   const hours = Math.min(Number(req.query.hours) || 24, 24 * 90);
   const dbClients = await Client.findAll({
-    attributes: ['id', 'name', 'groupName', 'sortOrder', 'createdAt'],
+    attributes: ['id', 'name', 'groupName', 'country', 'countryName', 'sortOrder', 'createdAt'],
     order: [['sortOrder', 'ASC'], ['createdAt', 'DESC']],
   });
   const onlineStates = clientManager.getAllClients();
@@ -155,6 +155,8 @@ export async function getPublicStatus(req: Request, res: Response) {
       id: c.id,
       name: c.name,
       group: c.groupName,
+      country: c.country,
+      countryName: c.countryName,
       status,
       uptime: calcUptimePercent(timeline),
       timeline,

@@ -9,6 +9,8 @@ export interface PublicServer {
   id: string;
   name: string;
   group: string;
+  country: string | null;
+  countryName: string | null;
   status: 'online' | 'warning' | 'offline' | 'empty';
   uptime: number | null;
   timeline: Array<{ status: string; start: string; end: string }>;
