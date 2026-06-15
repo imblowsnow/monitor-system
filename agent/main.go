@@ -185,6 +185,43 @@ func newAgent() *connection.Client {
 		}
 	}()
 
+	// reportMetrics 采集系统指标与各扩展采集器结果并上报。
+	// 既被定时器周期性调用，也在 agent 上线后立刻调用一次，避免等待首个周期。
+	reportMetrics := func() {
+		if !client.IsConnected() {
+			return
+		}
+		metrics, err := collectors.Collect()
+		if err != nil {
+			log.Printf("Collection error: %v", err)
+			return
+		}
+		// 将系统指标摊平成 map，再把各扩展采集器结果以采集器名为 key 直接平铺到顶层一起上报。
+		raw, _ := json.Marshal(metrics)
+		payload := map[string]interface{}{}
+		json.Unmarshal(raw, &payload)
+
+		rc := config.GetRuntime()
+		for name, c := range collectors.All() {
+			data, err := c.Collect(rc)
+			if err != nil {
+				log.Printf("Collector %s error: %v", name, err)
+				continue
+			}
+			payload[name] = data
+		}
+
+		client.Send(connection.WSMessage{
+			ID:        generateID(),
+			Type:      connection.MsgMetricsReport,
+			Timestamp: time.Now().UnixMilli(),
+			Payload:   payload,
+		})
+	}
+
+	// agent 上线（认证成功）后立刻上报一次，无需等待首个上报周期。
+	client.OnConnected(reportMetrics)
+
 	go func() {
 		tick := 0
 		for {
@@ -194,40 +231,14 @@ func newAgent() *connection.Client {
 			}
 			time.Sleep(time.Duration(interval) * time.Second)
 
-			if !client.IsConnected() {
-				continue
-			}
-
-			metrics, err := collectors.Collect()
-			if err != nil {
-				log.Printf("Collection error: %v", err)
-			} else {
-				// 将系统指标摊平成 map，再把各扩展采集器结果以采集器名为 key 直接平铺到顶层一起上报。
-				raw, _ := json.Marshal(metrics)
-				payload := map[string]interface{}{}
-				json.Unmarshal(raw, &payload)
-
-				rc := config.GetRuntime()
-				for name, c := range collectors.All() {
-					data, err := c.Collect(rc)
-					if err != nil {
-						log.Printf("Collector %s error: %v", name, err)
-						continue
-					}
-					payload[name] = data
-				}
-
-				client.Send(connection.WSMessage{
-					ID:        generateID(),
-					Type:      connection.MsgMetricsReport,
-					Timestamp: time.Now().UnixMilli(),
-					Payload:   payload,
-				})
-			}
+			reportMetrics()
 
 			// 每 12 个周期主动拉取一次配置，作为热推送的兜底。
 			tick++
 			if tick%12 == 0 {
+				if !client.IsConnected() {
+					continue
+				}
 				client.Send(connection.WSMessage{
 					ID:        generateID(),
 					Type:      connection.MsgConfigRequest,

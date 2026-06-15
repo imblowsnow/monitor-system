@@ -68,16 +68,17 @@ type AuthResultPayload struct {
 type MessageHandler func(msg *WSMessage)
 
 type Client struct {
-	cfg        *config.Config
-	conn       *websocket.Conn
-	mu         sync.Mutex
-	connected  bool
-	handlers   map[MessageType]MessageHandler
-	queue      []WSMessage
-	queueMu    sync.Mutex
-	maxQueue   int
-	stopChan   chan struct{}
-	clientID   string
+	cfg         *config.Config
+	conn        *websocket.Conn
+	mu          sync.Mutex
+	connected   bool
+	handlers    map[MessageType]MessageHandler
+	queue       []WSMessage
+	queueMu     sync.Mutex
+	maxQueue    int
+	stopChan    chan struct{}
+	clientID    string
+	onConnected func()
 }
 
 func NewClient(cfg *config.Config) *Client {
@@ -92,6 +93,12 @@ func NewClient(cfg *config.Config) *Client {
 
 func (c *Client) OnMessage(msgType MessageType, handler MessageHandler) {
 	c.handlers[msgType] = handler
+}
+
+// OnConnected 注册认证成功后的回调，用于在 agent 上线后立刻触发一次上报，
+// 避免等待首个上报周期（默认 30s）才有数据。
+func (c *Client) OnConnected(handler func()) {
+	c.onConnected = handler
 }
 
 func (c *Client) Send(msg WSMessage) error {
@@ -231,6 +238,9 @@ func (c *Client) readLoop() {
 						result.Config.ReportInterval, len(result.Config.NetNodes), result.Config.Docker)
 				}
 				c.flushQueue()
+				if c.onConnected != nil {
+					go c.onConnected()
+				}
 			} else {
 				log.Printf("Auth failed: %s", result.Reason)
 				c.mu.Lock()
