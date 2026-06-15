@@ -4,17 +4,16 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"runtime"
 	"sync"
 
-	"github.com/creack/pty"
+	"github.com/aymanbagabas/go-pty"
 )
 
 type Session struct {
 	ID   string
-	Cmd  *exec.Cmd
-	Pty  *os.File
+	Pty  pty.Pty
+	Cmd  *pty.Cmd
 	mu   sync.Mutex
 	done chan struct{}
 }
@@ -52,18 +51,27 @@ func (m *Manager) Open(sessionId string, cols, rows uint16) error {
 		}
 	}
 
-	cmd := exec.Command(shell)
+	ptmx, err := pty.New()
+	if err != nil {
+		return fmt.Errorf("failed to create pty: %w", err)
+	}
+
+	cmd := ptmx.Command(shell)
 	cmd.Env = os.Environ()
 
-	ptmx, err := pty.StartWithSize(cmd, &pty.Winsize{Rows: rows, Cols: cols})
-	if err != nil {
-		return fmt.Errorf("failed to start pty: %w", err)
+	if err := cmd.Start(); err != nil {
+		ptmx.Close()
+		return fmt.Errorf("failed to start shell: %w", err)
+	}
+
+	if cols > 0 && rows > 0 {
+		_ = ptmx.Resize(int(cols), int(rows))
 	}
 
 	session := &Session{
 		ID:   sessionId,
-		Cmd:  cmd,
 		Pty:  ptmx,
+		Cmd:  cmd,
 		done: make(chan struct{}),
 	}
 	m.sessions[sessionId] = session
@@ -95,7 +103,7 @@ func (m *Manager) Resize(sessionId string, cols, rows uint16) error {
 		return fmt.Errorf("session not found: %s", sessionId)
 	}
 
-	return pty.Setsize(session.Pty, &pty.Winsize{Rows: rows, Cols: cols})
+	return session.Pty.Resize(int(cols), int(rows))
 }
 
 func (m *Manager) Close(sessionId string) {
@@ -109,8 +117,10 @@ func (m *Manager) Close(sessionId string) {
 	m.mu.Unlock()
 
 	session.Pty.Close()
-	session.Cmd.Process.Kill()
-	session.Cmd.Wait()
+	if session.Cmd != nil && session.Cmd.Process != nil {
+		session.Cmd.Process.Kill()
+		session.Cmd.Wait()
+	}
 	close(session.done)
 }
 
@@ -131,16 +141,16 @@ func (m *Manager) readLoop(session *Session) {
 	buf := make([]byte, 4096)
 	for {
 		n, err := session.Pty.Read(buf)
+		if n > 0 && m.onData != nil {
+			data := make([]byte, n)
+			copy(data, buf[:n])
+			m.onData(session.ID, data)
+		}
 		if err != nil {
 			if err != io.EOF {
 				// session ended
 			}
 			break
-		}
-		if n > 0 && m.onData != nil {
-			data := make([]byte, n)
-			copy(data, buf[:n])
-			m.onData(session.ID, data)
 		}
 	}
 	if m.onClose != nil {
