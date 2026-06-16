@@ -67,7 +67,10 @@ export function uptimePercent(timeline: Segment[]): number | null {
     if (seg.status === 'online') online += dur;
   }
   if (!total) return null;
-  return Math.round((online / total) * 1000) / 10;
+  // 用 floor 而非 round:只要出现过 warning/offline,就不会四舍五入成 100%。
+  // 唯有全程 online(online === total)才返回精确的 100。
+  if (online >= total) return 100;
+  return Math.floor((online / total) * 1000) / 10;
 }
 
 // 状态严重度:数值越大越严重。用于在一个时间槽内取「最差」状态,避免漏掉异常。

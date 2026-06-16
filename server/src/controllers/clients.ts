@@ -99,7 +99,10 @@ function calcUptimePercent(timeline: Array<{ status: string; start: string; end:
     if (seg.status === 'online') online += dur;
   }
   if (!total) return null;
-  return Math.round((online / total) * 1000) / 10;
+  // 用 floor 而非 round:只要出现过 warning/offline,就不会四舍五入成 100%。
+  // 唯有全程 online(online === total)才返回精确的 100。
+  if (online >= total) return 100;
+  return Math.floor((online / total) * 1000) / 10;
 }
 
 /** 构建某 client 在过去 hours 小时内的状态时间线(与 getUptimeTimeline 同一算法)。 */
