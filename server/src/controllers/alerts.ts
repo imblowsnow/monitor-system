@@ -29,7 +29,10 @@ export async function deleteRule(req: Request, res: Response) {
 export async function getEvents(req: Request, res: Response) {
   const page = parseInt(req.query.page as string) || 1;
   const pageSize = parseInt(req.query.pageSize as string) || 20;
+  // clientId 可选:存在时仅返回该客户端的告警事件,供节点详情页告警列表使用
+  const where = req.query.clientId ? { clientId: req.query.clientId as string } : undefined;
   const { rows, count } = await AlertEvent.findAndCountAll({
+    where,
     order: [['triggeredAt', 'DESC']],
     offset: (page - 1) * pageSize,
     limit: pageSize,

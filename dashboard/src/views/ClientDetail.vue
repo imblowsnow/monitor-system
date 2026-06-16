@@ -23,6 +23,9 @@
       <el-button type="success" :icon="Platform" @click="openTerminal">终端</el-button>
     </div>
 
+    <el-tabs v-model="activeTab" class="detail-tabs">
+    <!-- ============ 监控 ============ -->
+    <el-tab-pane label="监控" name="monitor">
     <!-- 实时指标卡 -->
     <div class="metric-row">
       <div class="metric-card surface">
@@ -86,7 +89,7 @@
       </div>
       <div class="surface panel">
         <div class="panel-head"><h3>磁盘使用</h3></div>
-        <el-table :data="latestDisk" size="small">
+        <el-table :data="latestDisk" size="small" max-height="240">
           <el-table-column prop="mount" label="挂载点" />
           <el-table-column label="使用率">
             <template #default="{ row }">
@@ -118,11 +121,66 @@
         <v-chart :option="dockerChartOption" autoresize style="height: 240px" />
       </div>
     </div>
+    </el-tab-pane>
+
+    <!-- ============ 在线状态 ============ -->
+    <el-tab-pane label="在线状态" name="uptime">
+      <div class="surface panel">
+        <el-table :data="uptimeRows" v-loading="uptimeLoading" max-height="520">
+          <el-table-column label="开始时间" min-width="170">
+            <template #default="{ row }">{{ new Date(row.start).toLocaleString('zh-CN') }}</template>
+          </el-table-column>
+          <el-table-column label="结束时间" min-width="170">
+            <template #default="{ row }">{{ new Date(row.end).toLocaleString('zh-CN') }}</template>
+          </el-table-column>
+          <el-table-column label="时长" width="120">
+            <template #default="{ row }">{{ formatDuration(row.start, row.end) }}</template>
+          </el-table-column>
+          <el-table-column label="状态" width="110">
+            <template #default="{ row }">
+              <el-tag :type="statusType(row.status)" effect="light" size="small">{{ statusLabel(row.status) }}</el-tag>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+    </el-tab-pane>
+
+    <!-- ============ 告警列表 ============ -->
+    <el-tab-pane label="告警列表" name="events">
+      <div class="surface panel">
+        <el-table :data="events" v-loading="eventsLoading">
+          <el-table-column label="规则"><template #default="{ row }">{{ row.AlertRule?.name || row.ruleId }}</template></el-table-column>
+          <el-table-column prop="currentValue" label="当前值" width="100" />
+          <el-table-column label="状态" width="100">
+            <template #default="{ row }">
+              <el-tag :type="row.status === 'firing' ? 'danger' : 'success'" size="small">
+                {{ row.status === 'firing' ? '触发中' : '已恢复' }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="触发时间">
+            <template #default="{ row }">{{ new Date(row.triggeredAt).toLocaleString('zh-CN') }}</template>
+          </el-table-column>
+          <el-table-column label="恢复时间">
+            <template #default="{ row }">{{ row.resolvedAt ? new Date(row.resolvedAt).toLocaleString('zh-CN') : '—' }}</template>
+          </el-table-column>
+        </el-table>
+        <el-pagination
+          class="pager"
+          layout="total, prev, pager, next"
+          :total="eventsTotal"
+          :page-size="eventsPageSize"
+          :current-page="eventsPage"
+          @current-change="onEventsPageChange"
+        />
+      </div>
+    </el-tab-pane>
+    </el-tabs>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ArrowLeft, Platform } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
@@ -150,6 +208,8 @@ const metricsHistory = ref<any[]>([]);
 const uptimeData = ref<Segment[]>([]);
 const range = ref<'live' | 'today' | '7d' | '30d'>('live');
 const rangeLoading = ref(false);
+// 顶部 Tab 切换:监控 / 在线状态 / 告警列表
+const activeTab = ref<'monitor' | 'uptime' | 'events'>('monitor');
 // Agent 更新状态
 const updateInfo = ref<{ hasUpdate: boolean; latestVersion: string | null; currentVersion: string | null } | null>(null);
 const updating = ref(false);
@@ -224,6 +284,60 @@ async function loadUptime() {
 
 const beats = computed(() => buildBeats(uptimeData.value, 48, HB_HOURS[range.value]));
 const uptimeOf = computed(() => uptimePercent(uptimeData.value));
+
+// ===== 在线状态 Tab：独立时间范围，使用现有 uptime 接口 =====
+const uptimeRange = ref<'live' | '7d' | '30d'>('live');
+const tabUptimeData = ref<Segment[]>([]);
+const uptimeLoading = ref(false);
+// 时间线倒序：最近的状态段排在最前
+const uptimeRows = computed(() => [...tabUptimeData.value].reverse());
+const tabUptimeOf = computed(() => uptimePercent(tabUptimeData.value));
+async function loadUptimeTab() {
+  uptimeLoading.value = true;
+  try {
+    const { data } = await api.get(`/clients/${route.params.id}/uptime?hours=${HB_HOURS[uptimeRange.value]}`);
+    tabUptimeData.value = data.timeline || [];
+  } finally {
+    uptimeLoading.value = false;
+  }
+}
+
+// 状态段时长，人类可读（天/时/分）
+function formatDuration(start: string, end: string) {
+  let sec = Math.round((new Date(end).getTime() - new Date(start).getTime()) / 1000);
+  if (sec < 60) return `${sec} 秒`;
+  const d = Math.floor(sec / 86400); sec %= 86400;
+  const h = Math.floor(sec / 3600); sec %= 3600;
+  const m = Math.floor(sec / 60);
+  const parts: string[] = [];
+  if (d) parts.push(`${d} 天`);
+  if (h) parts.push(`${h} 时`);
+  if (m) parts.push(`${m} 分`);
+  return parts.join(' ') || '0 分';
+}
+
+// ===== 告警列表 Tab：使用 alerts/events 接口，按 clientId 过滤 =====
+const events = ref<any[]>([]);
+const eventsTotal = ref(0);
+const eventsPage = ref(1);
+const eventsPageSize = ref(20);
+const eventsLoading = ref(false);
+async function fetchEvents() {
+  eventsLoading.value = true;
+  try {
+    const { data } = await api.get('/alerts/events', {
+      params: { clientId: route.params.id, page: eventsPage.value, pageSize: eventsPageSize.value },
+    });
+    events.value = data.rows;
+    eventsTotal.value = data.total;
+  } finally {
+    eventsLoading.value = false;
+  }
+}
+function onEventsPageChange(page: number) {
+  eventsPage.value = page;
+  fetchEvents();
+}
 
 const latest = computed(() => metricsHistory.value[metricsHistory.value.length - 1] || {});
 const latestCpu = computed(() => Math.round(latest.value.cpuUsage ?? latest.value.cpu?.usage ?? 0));
@@ -470,6 +584,12 @@ onMounted(async () => {
   }));
 });
 
+// 切到对应 Tab 时按需加载数据（首次进入时拉取一次）
+watch(activeTab, (tab) => {
+  if (tab === 'uptime' && !tabUptimeData.value.length) loadUptimeTab();
+  if (tab === 'events' && !events.value.length) fetchEvents();
+});
+
 onUnmounted(() => {
   unsubs.forEach(fn => fn());
   unsubs = [];
@@ -593,4 +713,23 @@ onUnmounted(() => {
 .upd { font-size: 12px; color: var(--text-3); }
 .last-upd { font-size: 12px; color: var(--text-3); white-space: nowrap; }
 .docker-err { font-size: 13px; color: var(--text-3); padding: 8px 0; }
+
+.detail-tabs :deep(.el-tabs__content) {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.detail-tabs :deep(.el-tab-pane) {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.uptime-summary {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.uptime-sub { font-size: 13px; color: var(--text-3); }
+.pager { margin-top: 14px; display: flex; justify-content: flex-end; }
 </style>
